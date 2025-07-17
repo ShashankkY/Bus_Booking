@@ -1,35 +1,77 @@
-const User = require('../models/users');
+const { User, Booking, Bus } = require('../models/associations');
 
-exports.addUser = async (req, res) => {
-  try {
-    const { name, email } = req.body;
+const userController = {
+  // Create a new user
+  async createUser(req, res) {
+    try {
+      const { name, email } = req.body;
+      
+      if (!name || !email) {
+        return res.status(400).json({ error: 'Name and email are required' });
+      }
 
-    if (!name || !email) {
-      return res.status(400).send("❌ Name and Email are required");
+      const user = await User.create({ name, email });
+      res.status(201).json(user);
+    } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') {
+        return res.status(400).json({ error: 'Email already exists' });
+      }
+      res.status(500).json({ error: error.message });
     }
+  },
 
-    const newUser = await User.create({ name, email });
+  // Get all users
+  async getAllUsers(req, res) {
+    try {
+      const users = await User.findAll();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
 
-    res.status(201).json({
-      message: `✅ User ${name} added`,
-      user: newUser
-    });
-  } catch (error) {
-    console.error("❌ Error adding user:", error.message);
-    res.status(500).json({ error: '❌ Unable to add user', details: error.message });
+  // Get user by ID
+async getUserById(req, res) {
+    try {
+      const { id } = req.params;
+      const user = await User.findByPk(id);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // Get all bookings for a specific user with bus details
+  async getUserBookings(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const user = await User.findByPk(id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const bookings = await Booking.findAll({
+        where: { userId: id },
+        include: [{
+          model: Bus,
+          attributes: ['busNumber', 'totalSeats', 'availableSeats']
+        }]
+      });
+
+      res.json(bookings);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 
-
-exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await User.findAll();
-    res.status(200).json(users);
-  } catch (error) {
-    console.error("❌ Error fetching users:", error.message);
-    res.status(500).send(error.message);
-  }
-};
+module.exports = userController;
 
 
 

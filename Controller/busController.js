@@ -1,52 +1,77 @@
-const Bus = require('../models/buses');
-const { Sequelize } = require('sequelize');
+const { Bus, Booking, User } = require('../models/associations');
 
+const busController = {
+  // Create a new bus
+  async createBus(req, res) {
+    try {
+      const { busNumber, totalSeats, availableSeats } = req.body;
+      
+      if (!busNumber || !totalSeats || availableSeats === undefined) {
+        return res.status(400).json({ error: 'Bus number, total seats, and available seats are required' });
+      }
 
-exports.addBus = async (req, res) => {
-  try {
-    const { busNumber, totalSeats, availableSeats } = req.body;
-
-    console.log("📥 Incoming request body:", req.body); // Debug
-
-    // Validate request
-    if (!busNumber || !totalSeats || !availableSeats) {
-      return res.status(400).send("❌ Missing fields in request body");
+      const bus = await Bus.create({ busNumber, totalSeats, availableSeats });
+      res.status(201).json(bus);
+    } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') {
+        return res.status(400).json({ error: 'Bus number already exists' });
+      }
+      res.status(500).json({ error: error.message });
     }
+  },
 
-    const bus = await Bus.create({ busNumber, totalSeats, availableSeats });
+  // Get all buses
+  async getAllBuses(req, res) {
+    try {
+      const buses = await Bus.findAll();
+      res.json(buses);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
 
-    res.status(201).json({ message: '✅ Bus added successfully', bus });
-  } catch (error) {
-    console.error("❌ Error adding bus:", error.message);  // Show actual error
-    res.status(500).json({ error: '❌ Unable to add bus', details: error.message });
+  // Get bus by ID
+  async getBusById(req, res) {
+    try {
+      const { id } = req.params;
+      const bus = await Bus.findByPk(id);
+      
+      if (!bus) {
+        return res.status(404).json({ error: 'Bus not found' });
+      }
+      
+      res.json(bus);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // Get all bookings for a specific bus with user details
+  async getBusBookings(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const bus = await Bus.findByPk(id);
+      if (!bus) {
+        return res.status(404).json({ error: 'Bus not found' });
+      }
+
+      const bookings = await Booking.findAll({
+        where: { busId: id },
+        include: [{
+          model: User,
+          attributes: ['name', 'email']
+        }]
+      });
+
+      res.json(bookings);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 
-exports.getAvailableBuses = async (req, res) => {
-  try {
-    const minSeats = parseInt(req.params.seats);
-    const buses = await Bus.findAll({
-      where: Sequelize.literal(`availableSeats > ${minSeats}`)
-    });
-    res.status(200).json(buses);
-  } catch (error) {
-    res.status(500).send(error.message);
-  }
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+module.exports = busController;
 
 
 
